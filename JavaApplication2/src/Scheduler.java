@@ -18,17 +18,32 @@ import java.util.Iterator;
 import java.util.Arrays;
 import java.io.File;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+
 /**
  * 你地可以開始工作啦。
  * @author A mad kid
  */
 public class Scheduler {
 
+    private LocalDate starDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
+    private LocalTime startTime;
+    private LocalTime endTime;
+    private String eventName;
+    private int eventDuration;
+    private boolean limitTime;
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) {
+    
+    /*public static void main(String[] args) {
         // TODO code application logic here
-    }
+        private Date periodStart;
+        private Date periodEnd;
+    }*/
     
 }
