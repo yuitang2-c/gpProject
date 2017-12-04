@@ -24,10 +24,11 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
 /**
- * A sample class illustrating how to parse an iCalendar file using the iCal4j
- * library
+ * AST10106 Introduction to Programming - Group Programming Project
+ * Group No.: 45
  *
- * @author kingtin
+ * @author TANG Kai Yui, MOK Chun Tung, CHAN Sui Shan, KAYNAT Zainab
+ * 
  */
 public class Scheduler {
 
@@ -48,7 +49,9 @@ public class Scheduler {
     private int intEndTimeSlot;
     private int intCurrentTimeSlot;
     private int intEventLength;
+    private int intRange;
     private int score[];
+    private int notAttend[];
     
     
     public void setEventName(String eventName) {
@@ -92,18 +95,21 @@ public class Scheduler {
         temp.append(st);
         System.out.println(temp);
         intStartTimeSlot = timeConverter(temp);
-        temp.delete(0,14);
+        temp.delete(0, temp.length());
         
         temp.append(ed);
         temp.append(et);        
         System.out.println(temp);
         intEndTimeSlot = timeConverter(temp);
-        temp.delete(0,14);
-        intEventLength = intEndTimeSlot - intStartTimeSlot;
-        System.out.println(intEventLength);
-        score = new int[intEventLength];
-        for (int i = 0; i < intEventLength; i++)
+        temp.delete(0, temp.length());
+        intRange = intEndTimeSlot - intStartTimeSlot;
+        System.out.println(intRange);
+        score = new int[intRange];
+        notAttend = new int[intRange];
+        for (int i = 0; i < intRange; i++) {
             score [i] = 0;
+            notAttend [i] = 0;
+        }
         
         if (limitTime) {
             st = startTime.format(timeFormatter);
@@ -116,7 +122,7 @@ public class Scheduler {
             time += (temp.codePointAt(1) - 49) * 60;
             time += (temp.codePointAt(0) - 48) * 600;
             System.out.println(time);
-            for (int i = 0; i < intEventLength; i += 1440) {
+            for (int i = 0; i < intRange; i += 1440) {
                 for (int j = 0; j < time; j++) {
                     score [i + j] = -2147483648;
                 }
@@ -129,13 +135,13 @@ public class Scheduler {
             time += (temp.codePointAt(1) - 48) * 60;
             time += (temp.codePointAt(0) - 48) * 600;
             System.out.println(time);
-            for (int i = 0; i < intEventLength; i += 1440) {
+            for (int i = 0; i < intRange; i += 1440) {
                 for (int j = time; j < 1440; j++) {
                     score [i + j] = -2147483648;
                 }
             }
         }
-
+        
         try {
             periodStart = new DateTime(sd + "T" + st);
             periodEnd = new DateTime(ed + "T" + et);
@@ -153,12 +159,14 @@ public class Scheduler {
                 printCalendarFile(file.getPath());
             }
         }
-        for (int i = 1; i <= intEventLength; i++){
-            if (i % 60 == 0){
-                System.out.printf("%d\n", score[i - 1]);
+        int maxScore = 0, bestDate = 0;
+        for (int i = 1; i <= intRange; i++){
+            if (score[i - 1] > maxScore){
+                bestDate = intStartTimeSlot + i - 1;
+                maxScore = score[i];
             }
-            else System.out.printf("%d ", score[i - 1]);
         }
+        System.out.printf("%d", bestDate / 365);
     }
 
     public static Date readDateProperty(Property property) throws ParseException {
@@ -173,17 +181,6 @@ public class Scheduler {
         /*System.out.println(dt);
         System.out.println(value);*/
         return dt;
-    }
-
-    // We are using another method to process data;
-    
-    public static Date addHours(Date dt, int hours) {
-        java.util.Calendar cal = java.util.Calendar.getInstance(); 	// creates a calendar utility
-        cal.setTime(dt);						// sets calendar time/date
-        cal.add(java.util.Calendar.HOUR_OF_DAY, hours);                 // adds hours
-        Date newDt = new DateTime();
-        newDt.setTime(cal.getTime().getTime());
-        return newDt;
     }
     
 
@@ -248,10 +245,7 @@ public class Scheduler {
             
             // The current time slot to check against the event
             // Reply: We are using another method to chek against the event
-            
-            Date slotStart = periodStart;
-            Date slotEnd = addHours(periodStart, 1);
-            System.out.println("Current time slot: " + slotStart + " to " + slotEnd);
+
             
             //Our edited code
 
@@ -277,48 +271,181 @@ public class Scheduler {
                 Property dtEnd = component.getProperty(Property.DTEND);
                 Date evtEnd = readDateProperty(dtEnd);
                 System.out.println("\tEvent End:   " + evtEnd);
+
                 
-                if (exHoliday) {
-                    if (calName.equals("Hong Kong Public Holidays")){
-                        StringBuilder temp = new StringBuilder();
-                        temp.append(evtStart);
-                        temp.delete(8, 9);
-                        System.out.println(temp);
-                        intCurrentTimeSlot = timeConverter(temp) - intStartTimeSlot;
-                        if (intCurrentTimeSlot > 0 && intCurrentTimeSlot < intEventLength)
-                        for (int j = 0; j < 1440; j++){
-                            score [intCurrentTimeSlot + j] = -2147483648;
+                System.out.println(summary.getValue() + eventName);
+                if (!summary.getValue().equals(eventName)){
+                    
+                    if (exHoliday) {
+                        if (calName.equals("Hong Kong Public Holidays")){
+                            StringBuilder temp = new StringBuilder();
+                            temp.append(evtStart);
+                            temp.delete(8, 9);
+                            //System.out.println(temp);
+                            intCurrentTimeSlot = timeConverter(temp) - intStartTimeSlot;
+                            if (intCurrentTimeSlot > 0 && intCurrentTimeSlot < intRange)
+                            for (int j = 0; j < 1440; j++){
+                                score [intCurrentTimeSlot + j] = -2147483648;
+                            }
                         }
+                    }
+                    
+                    Property rRule = component.getProperty(Property.RRULE);
+                    if (rRule != null) {
+                        // partially reform
+                        RRule r = new RRule(rRule.getValue());
+                        Date seed = evtStart;
+                        DateList list = r.getRecur().getDates(seed, periodStart, periodEnd, Value.DATE_TIME);
+                        /*if (0 == list.size()) {
+                            System.out.println("\tThe event does not occur in the specified period.");
+                        } else {
+                            System.out.println("\tThe event occurs on the dates below in the specified period.");
+                        }*/
+                        for (int n = 0; n < list.size(); n++) {
+                            DateTime rDateStart = (DateTime) list.get(n);
+                            DateTime rDateEnd = new DateTime(rDateStart.toString().substring(0, 8) + "T" +
+                                evtEnd.toString().substring(9, 15));
+                            StringBuilder temp = new StringBuilder();
+                            temp.append(rDateStart);
+                            temp.delete(8,9);
+                            //System.out.println(temp);
+                            int tempStart = timeConverter(temp);
+                            System.out.println(tempStart);
+                            temp.delete(0,14);
+                            temp.append(rDateEnd);
+                            //System.out.println(temp);
+                            int tempEnd = timeConverter(temp);
+                            System.out.println(tempEnd);
+                            if (tempStart > 0 && tempEnd < intRange) {
+                                for (int j = tempStart; j < tempEnd; j++) {
+                                    notAttend [j]++;
+                                }
+                            }
+                            /*System.out.print("\t" + rDateStart + " compares with " + slotStart + ": " + 
+                                rDateStart.compareTo(slotStart));
+                            System.out.println(", " + rDateEnd + " compares with " + slotEnd + ": " + 
+                                rDateEnd.compareTo(slotEnd));*/
+                        }
+                    }else {
+                        // partially reform
+                        /*System.out.println("\t" + evtStart + " compares with " + slotStart + ": " + 
+                            evtStart.compareTo(slotStart));
+                        System.out.println("\t" + evtEnd + " compares with " + slotEnd + ": " + 
+                            evtEnd.compareTo(slotEnd));*/
+                            StringBuilder temp = new StringBuilder();
+                            temp.append(evtStart);
+                            temp.delete(8,9);
+                            int tempStart = timeConverter(temp);
+                            System.out.println(tempStart);
+                            int length = temp.length();
+                            temp.delete(0,length);
+                            temp.append(evtEnd);
+                            temp.delete(8,9);
+                            //System.out.println(temp);
+                            int tempEnd = timeConverter(temp);
+                            System.out.println(tempEnd);
+                            if (tempStart > 0 && tempEnd < intRange) {
+                                for (int j = tempStart; j < tempEnd; j++) {
+                                    notAttend [j]++;
+                                }
+                            }
                     }
                 }
                 
-                Property rRule = component.getProperty(Property.RRULE);
-                if (rRule != null) {
-                    // partially reform
-                    RRule r = new RRule(rRule.getValue());
-                    Date seed = evtStart;
-                    DateList list = r.getRecur().getDates(seed, periodStart, periodEnd, Value.DATE_TIME);
-                    if (0 == list.size()) {
-                        System.out.println("\tThe event does not occur in the specified period.");
+                
+                else {
+                    System.out.println("wtf?");
+                    Property rRule = component.getProperty(Property.RRULE);
+                    if (rRule != null) {
+                        // partially reform
+                        RRule r = new RRule(rRule.getValue());
+                        Date seed = evtStart;
+                        DateList list = r.getRecur().getDates(seed, periodStart, periodEnd, Value.DATE_TIME);
+                        if (0 == list.size()) {
+                            System.out.println("\tThe event does not occur in the specified period.");
+                        } else {
+                            System.out.println("\tThe event occurs on the dates below in the specified period.");
+                        }
+                        for (int n = 0; n < list.size(); n++) {
+                            DateTime rDateStart = (DateTime) list.get(n);
+                            DateTime rDateEnd = new DateTime(rDateStart.toString().substring(0, 8) + "T" + 
+                                evtEnd.toString().substring(9, 15));
+                            StringBuilder temp = new StringBuilder();
+                            temp.append(rDateStart);
+                            temp.delete(8,9);
+                            System.out.println(temp);
+                            int tempStart = timeConverter(temp) - intStartTimeSlot;
+                            System.out.println(tempStart);
+                            int length = temp.length();          
+                            temp.delete(0,length);
+                            temp.append(rDateEnd);
+                            System.out.println(temp);
+                            int tempEnd = timeConverter(temp) - intStartTimeSlot;
+                            System.out.println(tempEnd);
+                            if (tempStart > 0 && tempEnd < intRange) {
+                                String choice = description.getValue();
+                                System.out.println(choice);
+                                if (choice.equals("1st preference")){
+                                    for (int j = 0; j < tempEnd - tempStart - eventLength * 60; j++){
+                                        score [tempStart + j] += 5;
+                                    }
+                                }
+                                if (choice.equals("2nd preference")){
+                                    for (int j = 0; j < tempEnd - tempStart - eventLength * 60; j++){
+                                        score [tempStart + j] += 3;
+                                    }
+                                }
+                                if (choice.equals("3rd preference")){
+                                    for (int j = 0; j < tempEnd - tempStart - eventLength * 60; j++){
+                                        score [tempStart + j] += 2;
+                                    }
+                                }                                
+                            }
+                            /*System.out.print("\t" + rDateStart + " compares with " + slotStart + ": " + 
+                                rDateStart.compareTo(slotStart));
+                            System.out.println(", " + rDateEnd + " compares with " + slotEnd + ": " + 
+                                rDateEnd.compareTo(slotEnd));*/
+                        }
                     } else {
-                        System.out.println("\tThe event occurs on the dates below in the specified period.");
+                        // partially reform
+                        /*System.out.println("\t" + evtStart + " compares with " + slotStart + ": " + 
+                            evtStart.compareTo(slotStart));
+                        System.out.println("\t" + evtEnd + " compares with " + slotEnd + ": " + 
+                            evtEnd.compareTo(slotEnd));*/
+                            StringBuilder temp = new StringBuilder();
+                            temp.append(evtStart);
+                            temp.delete(8,9);
+                            System.out.println(temp);
+                            int tempStart = timeConverter(temp) - intStartTimeSlot;
+                            System.out.println(tempStart);
+                            
+                            int length = temp.length();          
+                            temp.delete(0,length);
+                            temp.append(evtEnd);
+                            temp.delete(8,9);
+                            System.out.println(temp);
+                            int tempEnd = timeConverter(temp) - intStartTimeSlot;
+                            System.out.println(tempEnd);
+                            if (tempStart > 0 && tempEnd < intRange) {
+                                String choice = description.getValue();
+                                System.out.println(choice);
+                                if (choice.equals("1st preference")){
+                                    for (int j = 0; j < tempEnd - tempStart - eventLength * 60; j++){
+                                        score [tempStart + j] += 5;
+                                    }
+                                }
+                                if (choice.equals("2nd preference")){
+                                    for (int j = 0; j < tempEnd - tempStart - eventLength * 60 ; j++){
+                                        score [tempStart + j] += 3;
+                                    }
+                                }
+                                if (choice.equals("3rd preference")){
+                                    for (int j = 0; j < tempEnd - tempStart - eventLength * 60; j++){
+                                        score [tempStart + j] += 2;
+                                    }
+                                }                                
+                            }
                     }
-                    for (int n = 0; n < list.size(); n++) {
-                        //StringBuilder currentTime = new StringBuilder();
-                        DateTime rDateStart = (DateTime) list.get(n);
-                        DateTime rDateEnd = new DateTime(rDateStart.toString().substring(0, 8) + "T" + 
-                            evtEnd.toString().substring(9, 15));
-                        /*System.out.print("\t" + rDateStart + " compares with " + slotStart + ": " + 
-                            rDateStart.compareTo(slotStart));
-                        System.out.println(", " + rDateEnd + " compares with " + slotEnd + ": " + 
-                            rDateEnd.compareTo(slotEnd));*/
-                    }
-                } else {
-                    // partially reform
-                    /*System.out.println("\t" + evtStart + " compares with " + slotStart + ": " + 
-                        evtStart.compareTo(slotStart));
-                    System.out.println("\t" + evtEnd + " compares with " + slotEnd + ": " + 
-                        evtEnd.compareTo(slotEnd));*/
                 }
             }
         } catch (IOException | ParseException | ParserException ex) {
